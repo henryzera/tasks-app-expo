@@ -1,25 +1,33 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, Platform, StatusBar as RNStatusBar, Image, Pressable, ActivityIndicator, Modal, Button } from 'react-native';
+import {
+  StyleSheet, Text, View, TextInput, TouchableOpacity,
+  SafeAreaView, Platform, StatusBar as RNStatusBar, Image,
+  Pressable, ActivityIndicator, Modal, Button,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Checkbox from 'expo-checkbox';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import TaskList from './src/components/TaskList';
-import { addTask, deleteTask, getAllTasks, updateTask, TaskItem } from './src/utils/handle-api';
-import { globalStyles } from './src/styles/global';
-import AboutScreen from './src/components/AboutScreen';
+import TaskList from '../../src/components/TaskList';
+import { globalStyles } from '../../src/styles/global';
+import AboutScreen from '../../src/components/AboutScreen';
+import { useTaskStore } from '../../src/store/useTaskStore';
 
-// TODO (Zustand): Importe o seu useTaskStore aqui
+export default function TasksScreen() {
+  const tasks = useTaskStore((state) => state.tasks);
+  const loading = useTaskStore((state) => state.loading);
+  const filter = useTaskStore((state) => state.filter);
+  const editingTask = useTaskStore((state) => state.editingTask);
+  const fetchTasks = useTaskStore((state) => state.fetchTasks);
+  const storeAddTask = useTaskStore((state) => state.addTask);
+  const storeUpdateTask = useTaskStore((state) => state.updateTask);
+  const deleteAllTasks = useTaskStore((state) => state.deleteAllTasks);
+  const setFilter = useTaskStore((state) => state.setFilter);
+  const setEditingTask = useTaskStore((state) => state.setEditingTask);
 
-export default function App() {
-  // TODO (Zustand): Remova este useState e utilize o seletor da sua store para pegar as tasks
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [taskId, setTaskId] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [taskId, setTaskId] = useState('');
   const [logoError, setLogoError] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'pending'>('all');
-
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -28,41 +36,42 @@ export default function App() {
   const [priority, setPriority] = useState<'Baixa' | 'Média' | 'Alta'>('Baixa');
 
   useEffect(() => {
-    // TODO (Zustand): Atualize esta chamada para usar a action correspondente da store
-    getAllTasks(setTasks, setLoading);
+    fetchTasks();
   }, []);
 
+  useEffect(() => {
+    if (editingTask) {
+      setIsUpdating(true);
+      setTaskId(editingTask._id);
+      setText(editingTask.text);
+      setCompleted(!!editingTask.completed);
+      setDueDate(editingTask.dueDate ? new Date(editingTask.dueDate) : null);
+      setModalVisible(true);
+    }
+  }, [editingTask]);
+
   const resetForm = () => {
-    setText("");
+    setText('');
     setCompleted(false);
     setDueDate(null);
     setPriority('Baixa');
     setIsUpdating(false);
-    setTaskId("");
+    setTaskId('');
     setModalVisible(false);
+    setEditingTask(null);
   };
 
-  const updateMode = (task: TaskItem) => {
-    setIsUpdating(true);
-    setTaskId(task._id);
-    setText(task.text);
-    setCompleted(!!task.completed);
-    setDueDate(task.dueDate ? new Date(task.dueDate) : null);
-    setModalVisible(true);
-  };
-
-  const handleSave = () => {
+  const handleSave = async () => {
     const formattedDate = dueDate ? dueDate.toISOString() : null;
     if (isUpdating) {
-      // TODO (Zustand): Substitua a chamada abaixo pela action de atualizar da sua store
-      updateTask(taskId, text, completed, formattedDate, setTasks, resetForm);
+      await storeUpdateTask(taskId, text, completed, formattedDate);
     } else {
-      // TODO (Zustand): Substitua a chamada abaixo pela action de adicionar da sua store
-      addTask(text, completed, formattedDate, setTasks, resetForm);
+      await storeAddTask(text, completed, formattedDate);
     }
+    resetForm();
   };
 
-  const onChangeDate = (event: any, selectedDate?: Date) => {
+  const onChangeDate = (_event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) setDueDate(selectedDate);
   };
@@ -74,9 +83,9 @@ export default function App() {
           {logoError ? (
             <Text style={styles.header}>Gerenciador de Tarefas</Text>
           ) : (
-            <Image 
-              source={require('./assets/task-app-banner.png')} 
-              style={styles.logo} 
+            <Image
+              source={require('../../assets/task-app-banner.png')}
+              style={styles.logo}
               onError={() => setLogoError(true)}
             />
           )}
@@ -88,20 +97,20 @@ export default function App() {
         </View>
 
         <View style={styles.filterContainer}>
-          <TouchableOpacity 
-            style={[styles.filterButton, filter === 'all' ? styles.filterButtonActive : styles.filterButtonInactive]} 
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'all' ? styles.filterButtonActive : styles.filterButtonInactive]}
             onPress={() => setFilter('all')}
           >
             <Text style={filter === 'all' ? styles.filterTextActive : styles.filterTextInactive}>Todas</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterButton, filter === 'completed' ? styles.filterButtonActive : styles.filterButtonInactive]} 
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'completed' ? styles.filterButtonActive : styles.filterButtonInactive]}
             onPress={() => setFilter('completed')}
           >
             <Text style={filter === 'completed' ? styles.filterTextActive : styles.filterTextInactive}>Concluídas</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.filterButton, filter === 'pending' ? styles.filterButtonActive : styles.filterButtonInactive]} 
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'pending' ? styles.filterButtonActive : styles.filterButtonInactive]}
             onPress={() => setFilter('pending')}
           >
             <Text style={filter === 'pending' ? styles.filterTextActive : styles.filterTextInactive}>Pendentes</Text>
@@ -109,25 +118,16 @@ export default function App() {
         </View>
 
         <View style={styles.actionButtonsContainer}>
-          <Pressable 
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.actionButtonAdd,
-              pressed && styles.actionButtonAddPressed
-            ]}
+          <Pressable
+            style={({ pressed }) => [styles.actionButton, styles.actionButtonAdd, pressed && styles.actionButtonAddPressed]}
             onPress={() => setModalVisible(true)}
           >
             <Text style={styles.actionButtonText}>Nova Tarefa</Text>
           </Pressable>
 
-          <Pressable 
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.deleteButton,
-              pressed && styles.deleteButtonPressed
-            ]}
-            // TODO (Zustand): Chame a action de deletar todas as tarefas da sua store
-            onPress={() => setTasks([])} 
+          <Pressable
+            style={({ pressed }) => [styles.actionButton, styles.deleteButton, pressed && styles.deleteButtonPressed]}
+            onPress={deleteAllTasks}
           >
             <Text style={styles.actionButtonText}>Excluir todas</Text>
           </Pressable>
@@ -146,16 +146,11 @@ export default function App() {
         )}
       </View>
 
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={resetForm}
-      >
+      <Modal visible={modalVisible} transparent={true} animationType="fade" onRequestClose={resetForm}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{isUpdating ? "Editar Tarefa" : "Nova Tarefa"}</Text>
-            
+            <Text style={styles.modalTitle}>{isUpdating ? 'Editar Tarefa' : 'Nova Tarefa'}</Text>
+
             <TextInput
               style={styles.modalInput}
               placeholder="Nome da tarefa..."
@@ -168,7 +163,7 @@ export default function App() {
               <Text style={styles.fieldLabel}>Data limite:</Text>
               {Platform.OS === 'web' ? (
                 // @ts-ignore
-                <input 
+                <input
                   type="date"
                   value={dueDate ? dueDate.toISOString().split('T')[0] : ''}
                   onChange={(e: any) => {
@@ -185,7 +180,7 @@ export default function App() {
               ) : (
                 <View style={{ flex: 1, marginLeft: 16, alignItems: 'flex-start' }}>
                   <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerBtn}>
-                    <Text>{dueDate ? dueDate.toLocaleDateString() : "Selecionar Data"}</Text>
+                    <Text>{dueDate ? dueDate.toLocaleDateString() : 'Selecionar Data'}</Text>
                   </TouchableOpacity>
                   {showDatePicker && (
                     <DateTimePicker
@@ -202,28 +197,24 @@ export default function App() {
             <View style={styles.fieldRow}>
               <Text style={styles.fieldLabel}>Concluída:</Text>
               <View style={styles.checkboxContainer}>
-                <Checkbox
-                  value={completed}
-                  onValueChange={setCompleted}
-                  color={completed ? '#000' : undefined}
-                />
+                <Checkbox value={completed} onValueChange={setCompleted} color={completed ? '#000' : undefined} />
               </View>
             </View>
 
             <View style={styles.fieldRow}>
               <Text style={styles.fieldLabel}>Prioridade:</Text>
               <View style={styles.priorityContainer}>
-                {['Baixa', 'Média', 'Alta'].map((p) => (
-                  <TouchableOpacity 
-                    key={p} 
+                {(['Baixa', 'Média', 'Alta'] as const).map((p) => (
+                  <TouchableOpacity
+                    key={p}
                     style={[
-                      styles.priorityButton, 
-                      priority === p && { 
+                      styles.priorityButton,
+                      priority === p && {
                         backgroundColor: p === 'Baixa' ? '#4caf50' : p === 'Média' ? '#ff9800' : '#f44336',
-                        borderColor: p === 'Baixa' ? '#4caf50' : p === 'Média' ? '#ff9800' : '#f44336'
-                      }
+                        borderColor: p === 'Baixa' ? '#4caf50' : p === 'Média' ? '#ff9800' : '#f44336',
+                      },
                     ]}
-                    onPress={() => setPriority(p as any)}
+                    onPress={() => setPriority(p)}
                   >
                     <Text style={[styles.priorityText, priority === p && styles.priorityTextActive]}>{p}</Text>
                   </TouchableOpacity>
@@ -235,8 +226,8 @@ export default function App() {
               <TouchableOpacity style={styles.modalCancelBtn} onPress={resetForm}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalSaveBtn, !text.trim() && styles.modalSaveBtnDisabled]} 
+              <TouchableOpacity
+                style={[styles.modalSaveBtn, !text.trim() && styles.modalSaveBtnDisabled]}
                 onPress={handleSave}
                 disabled={!text.trim()}
               >
@@ -247,11 +238,7 @@ export default function App() {
         </View>
       </Modal>
 
-      <Modal
-        visible={aboutModalVisible}
-        animationType="slide"
-        onRequestClose={() => setAboutModalVisible(false)}
-      >
+      <Modal visible={aboutModalVisible} animationType="slide" onRequestClose={() => setAboutModalVisible(false)}>
         <AboutScreen onClose={() => setAboutModalVisible(false)} />
       </Modal>
 
